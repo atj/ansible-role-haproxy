@@ -38,7 +38,7 @@ jobs:
           ansible-lint
 
   test:
-    name: Python ${{ matrix.python }} on ${{ matrix.distro }}
+    name: py:${{ matrix.python }} ansible:${{ matrix.ansible }} os:${{ matrix.distro }}
     runs-on: ubuntu-latest
     needs:
       - lint
@@ -46,8 +46,14 @@ jobs:
       matrix:
         python:
           - "3.10"
+          - "3.11"
+        ansible:
+          - 5
+          - 6
+          - 7
         distro:
           - ubuntu2004
+          - ubuntu2204
     steps:
       - name: Check out the codebase
         uses: actions/checkout@v3
@@ -59,16 +65,26 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install tox
-        run: pip3 install tox
-
-      - name: Cache tox directory
-        uses: actions/cache@v2
+      - name: Cache pip directory
+        uses: actions/cache@v3
         with:
-          path: metabrainz.haproxy/.tox
-          key: tox-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('**/tox.ini') }}
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-ansible${{ matrix.ansible }}-py${{ matrix.python }}-v1
+
+      - name: Install test dependencies
+        run: >-
+          pip3 install
+          'ansible==${{ matrix.ansible }}.*'
+          'docker==6.*'
+          'molecule-plugins[docker]'
+          'urllib3<2.0'
+
+      - name: Run pip freeze
+        run: pip3 freeze --all
 
       - name: Run tests
-        run: tox
+        run: molecule test
         env:
+          ANSIBLE_FORCE_COLOR: 1
+          PY_COLORS: 1
           MOLECULE_DISTRO: ${{ matrix.distro }}
